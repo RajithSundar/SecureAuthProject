@@ -86,12 +86,8 @@ int get_current_totp() { return generate_totp(std::time(0)); }
 bool validate_totp(int user_code) {
   time_t now = std::time(0);
 
-  // Check current window
+  // Check current window only (strict 30-second validation)
   if (generate_totp(now) == user_code)
-    return true;
-
-  // Check previous window (to allow for slight time drift/delay)
-  if (generate_totp(now - 30) == user_code)
     return true;
 
   return false;
