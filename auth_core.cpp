@@ -62,19 +62,13 @@ bool validate_login(const char *username, const char *password) {
   secure_strcpy(safe_username, username, sizeof(safe_username));
   secure_strcpy(safe_password, password, sizeof(safe_password));
 
-  // Debug output to console (visible in the terminal running build.py)
-  printf("[DEBUG] C++ Received Username: '%s'\n", safe_username);
-
   // Check username
   if (strcmp(safe_username, "admin") != 0) {
-    printf("[DEBUG] Username mismatch.\n");
     return false;
   }
 
   // Check password hash
   uint32_t input_hash = djb2_hash(safe_password);
-  printf("[DEBUG] Password Hash: %u, Expected: %u\n", input_hash,
-         STORED_PASSWORD_HASH);
 
   return input_hash == STORED_PASSWORD_HASH;
 }

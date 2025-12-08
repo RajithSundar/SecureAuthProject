@@ -13,6 +13,7 @@ __pycache__/
 .Python
 *.py[cod]
 *$py.class
+config.pyc
 
 # Virtual environments
 venv/

@@ -6,6 +6,165 @@ import sys
 import platform
 import time
 import math
+import qrcode
+from PIL import Image, ImageTk
+
+# Import configuration
+try:
+    from config import PRODUCTION_MODE, TOTP_SECRET, APP_NAME, ISSUER, ACCOUNT_NAME
+except ImportError:
+    # Fallback to demo mode if config not found
+    PRODUCTION_MODE = False
+    TOTP_SECRET = "MY_SUPER_SECRET_KEY"
+    APP_NAME = "SecureAuthSystem"
+    ISSUER = "SecureAuth"
+    ACCOUNT_NAME = "admin"
+
+
+class SetupWindow:
+    """Window for Google Authenticator setup with QR code"""
+    def __init__(self, parent):
+        self.window = tk.Toplevel(parent)
+        self.window.title("Google Authenticator Setup")
+        self.window.geometry("500x650")
+        self.window.resizable(False, False)
+        self.window.config(bg="#FFFFFF")
+        
+        # Make modal
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        self.create_ui()
+    
+    def create_ui(self):
+        # Title
+        title = tk.Label(
+            self.window,
+            text="📱 Google Authenticator Setup",
+            font=("Segoe UI", 20, "bold"),
+            fg="#1A1A1A",
+            bg="#FFFFFF"
+        )
+        title.pack(pady=(20, 10))
+        
+        # Instructions
+        instructions = tk.Label(
+            self.window,
+            text="Scan this QR code with Google Authenticator app:",
+            font=("Segoe UI", 11),
+            fg="#666666",
+            bg="#FFFFFF"
+        )
+        instructions.pack(pady=(0, 15))
+        
+        # Generate and display QR code
+        qr_frame = tk.Frame(self.window, bg="#FFFFFF")
+        qr_frame.pack(pady=10)
+        
+        qr_image = self.generate_qr_code()
+        qr_label = tk.Label(qr_frame, image=qr_image, bg="#FFFFFF")
+        qr_label.image = qr_image  # Keep reference
+        qr_label.pack()
+        
+        # Manual entry section
+        manual_frame = tk.Frame(self.window, bg="#F5F5F5", highlightthickness=1, 
+                               highlightbackground="#E0E0E0")
+        manual_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        manual_title = tk.Label(
+            manual_frame,
+            text="📝 Manual Entry",
+            font=("Segoe UI Semibold", 11),
+            fg="#1A1A1A",
+            bg="#F5F5F5"
+        )
+        manual_title.pack(pady=(10, 5))
+        
+        manual_text = tk.Label(
+            manual_frame,
+            text="If you can't scan the QR code, enter manually:",
+            font=("Segoe UI", 9),
+            fg="#666666",
+            bg="#F5F5F5"
+        )
+        manual_text.pack()
+        
+        # Secret key display
+        secret_frame = tk.Frame(manual_frame, bg="#FFFFFF", 
+                               highlightthickness=1, highlightbackground="#D0D0D0")
+        secret_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        secret_label = tk.Label(
+            secret_frame,
+            text=f"Secret Key: {TOTP_SECRET}",
+            font=("Consolas", 10, "bold"),
+            fg="#0078D4",
+            bg="#FFFFFF"
+        )
+        secret_label.pack(pady=8)
+        
+        # Step-by-step guide
+        steps_frame = tk.Frame(self.window, bg="#FFFFFF")
+        steps_frame.pack(fill=tk.X, padx=30, pady=(10, 20))
+        
+        steps = [
+            "1. Open Google Authenticator app",
+            "2. Tap '+' to add an account",
+            "3. Choose 'Scan QR code' or 'Enter setup key'",
+            "4. Scan the QR code above (or enter the secret key)",
+            "5. Your app will generate 6-digit codes every 30 seconds"
+        ]
+        
+        for step in steps:
+            step_label = tk.Label(
+                steps_frame,
+                text=step,
+                font=("Segoe UI", 9),
+                fg="#333333",
+                bg="#FFFFFF",
+                anchor="w"
+            )
+            step_label.pack(fill=tk.X, pady=2)
+        
+        # Close button
+        close_btn = tk.Button(
+            self.window,
+            text="Got it!",
+            command=self.window.destroy,
+            font=("Segoe UI Semibold", 11),
+            bg="#0078D4",
+            fg="#FFFFFF",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=30,
+            pady=10
+        )
+        close_btn.pack(pady=(0, 20))
+    
+    def generate_qr_code(self):
+        """Generate QR code for Google Authenticator"""
+        # Create TOTP URI
+        # Format: otpauth://totp/ISSUER:ACCOUNT?secret=SECRET&issuer=ISSUER
+        totp_uri = f"otpauth://totp/{ISSUER}:{ACCOUNT_NAME}?secret={TOTP_SECRET}&issuer={ISSUER}"
+        
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=8,
+            border=2,
+        )
+        qr.add_data(totp_uri)
+        qr.make(fit=True)
+        
+        # Create image
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to PhotoImage for tkinter
+        qr_photo = ImageTk.PhotoImage(qr_image)
+        
+        return qr_photo
+
 
 class GlassPanel(tk.Canvas):
     """Glass/Acrylic effect panel with blur simulation"""
@@ -350,24 +509,56 @@ class SecureAuthApp:
         else:
             self.setup_mfa_screen(glass_bg)
         
+        
         # Bottom info section
         bottom_frame = tk.Frame(glass_bg, bg="#FAFAFA")
         bottom_frame.pack(fill=tk.X, pady=(10, 20), padx=20)
         
-        # Demo TOTP with glass effect
-        totp_glass = tk.Frame(bottom_frame, bg="#FFF9E6", 
-                             highlightthickness=1, highlightbackground="#FFD700")
-        totp_glass.pack(fill=tk.X, pady=(0, 8))
-        
-        self.totp_debug_label = tk.Label(
-            totp_glass,
-            text="🔔 Current Valid TOTP: ---",
-            fg="#8B7500",
-            bg="#FFF9E6",
-            font=("Consolas", 10, "bold"),
-            pady=10
-        )
-        self.totp_debug_label.pack()
+        # Conditional TOTP display based on mode
+        if not PRODUCTION_MODE:
+            # Demo Mode: Show current TOTP
+            totp_glass = tk.Frame(bottom_frame, bg="#FFF9E6", 
+                                 highlightthickness=1, highlightbackground="#FFD700")
+            totp_glass.pack(fill=tk.X, pady=(0, 8))
+            
+            self.totp_debug_label = tk.Label(
+                totp_glass,
+                text="🔔 Current Valid TOTP: ---",
+                fg="#8B7500",
+                bg="#FFF9E6",
+                font=("Consolas", 10, "bold"),
+                pady=10
+            )
+            self.totp_debug_label.pack()
+        else:
+            # Production Mode: Show Google Authenticator button
+            prod_frame = tk.Frame(bottom_frame, bg="#E3F2FD", 
+                                 highlightthickness=1, highlightbackground="#2196F3")
+            prod_frame.pack(fill=tk.X, pady=(0, 8))
+            
+            prod_label = tk.Label(
+                prod_frame,
+                text="📱 Use Google Authenticator for TOTP codes",
+                fg="#1565C0",
+                bg="#E3F2FD",
+                font=("Segoe UI Semibold", 10),
+                pady=8
+            )
+            prod_label.pack()
+            
+            setup_btn = tk.Button(
+                prod_frame,
+                text="⚙️ Setup Authenticator",
+                command=lambda: SetupWindow(self.root),
+                font=("Segoe UI", 9),
+                bg="#2196F3",
+                fg="#FFFFFF",
+                relief=tk.FLAT,
+                cursor="hand2",
+                padx=15,
+                pady=5
+            )
+            setup_btn.pack(pady=(0, 8))
         
         # System status
         self.log_label = tk.Label(
@@ -557,20 +748,23 @@ class SecureAuthApp:
         self.totp_entry.entry.config(font=("Consolas", 18), justify="center")
         self.totp_entry.entry.focus_set()  # Auto-focus
         
+        
         # Enter to submit
         self.totp_entry.entry.bind("<Return>", lambda e: self.handle_totp())
         
-        # Copy button for demo TOTP
-        tk.Frame(form_container, bg="#FAFAFA", height=15).pack()
+        # Copy button for demo TOTP (only in demo mode)
+        if not PRODUCTION_MODE:
+            tk.Frame(form_container, bg="#FAFAFA", height=15).pack()
+            
+            copy_btn = ModernButton(
+                form_container,
+                text="📋 Copy Demo TOTP",
+                command=self.copy_demo_totp,
+                primary=False,
+                bg="#FAFAFA"
+            )
+            copy_btn.pack(fill=tk.X)
         
-        copy_btn = ModernButton(
-            form_container,
-            text="📋 Copy Demo TOTP",
-            command=self.copy_demo_totp,
-            primary=False,
-            bg="#FAFAFA"
-        )
-        copy_btn.pack(fill=tk.X)
         
         # Verify button
         tk.Frame(form_container, bg="#FAFAFA", height=15).pack()
@@ -696,8 +890,8 @@ class SecureAuthApp:
             messagebox.showerror("Error", f"Verification error: {e}")
 
     def update_demo_totp(self):
-        """Poll C++ backend for current code"""
-        if self.lib:
+        """Poll C++ backend for current code (only in demo mode)"""
+        if not PRODUCTION_MODE and self.lib and hasattr(self, 'totp_debug_label'):
             try:
                 code = self.lib.get_current_totp()
                 self.totp_debug_label.config(text=f"🔔 Current Valid TOTP: {code:06d}")
