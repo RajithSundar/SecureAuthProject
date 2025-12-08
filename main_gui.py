@@ -600,9 +600,15 @@ class SecureAuthApp:
         """Copy current TOTP to clipboard"""
         try:
             code = self.lib.get_current_totp()
+            totp_code = f"{code:06d}"
             self.root.clipboard_clear()
-            self.root.clipboard_append(f"{code:06d}")
+            self.root.clipboard_append(totp_code)
             self.log_label.config(text="✓ TOTP copied to clipboard!", fg="#107C10")
+            
+            # Show the TOTP code in a message box
+            messagebox.showinfo("TOTP Copied", 
+                f"Code copied to clipboard:\n\n{totp_code}\n\nPaste it in the verification field below.")
+            
             # Reset message after 2 seconds
             self.root.after(2000, lambda: self.log_label.config(
                 text="● System Ready | Secure Connection Active", fg="#666666"))
