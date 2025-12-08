@@ -7,15 +7,18 @@
 
 # Set to True for production deployment (hides demo TOTP display)
 # Set to False for demo/testing (shows TOTP on screen)
-PRODUCTION_MODE = False
+PRODUCTION_MODE = True
 
 # =============================================================================
 # TOTP CONFIGURATION
 # =============================================================================
 
-# TOTP Secret Key (shared with Google Authenticator or other TOTP apps)
-# IMPORTANT: In production, this should be unique per user and stored securely
-TOTP_SECRET = "MY_SUPER_SECRET_KEY"
+# TOTP Secret Key (Base32 encoded for Google Authenticator compatibility)
+# This is a valid Base32 string that Google Authenticator can use
+TOTP_SECRET = "JBSWY3DPEHPK3PXP"  # Base32: "Hello!"
+
+# For demo mode, we also keep the original secret for C++ backend
+TOTP_SECRET_DEMO = "MY_SUPER_SECRET_KEY"
 
 # Application Details for Google Authenticator
 APP_NAME = "SecureAuthSystem"

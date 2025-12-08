@@ -8,17 +8,23 @@ import time
 import math
 import qrcode
 from PIL import Image, ImageTk
+import pyotp
 
 # Import configuration
 try:
-    from config import PRODUCTION_MODE, TOTP_SECRET, APP_NAME, ISSUER, ACCOUNT_NAME
+    from config import PRODUCTION_MODE, TOTP_SECRET, TOTP_SECRET_DEMO, APP_NAME, ISSUER, ACCOUNT_NAME
 except ImportError:
     # Fallback to demo mode if config not found
     PRODUCTION_MODE = False
-    TOTP_SECRET = "MY_SUPER_SECRET_KEY"
+    TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+    TOTP_SECRET_DEMO = "MY_SUPER_SECRET_KEY"
     APP_NAME = "SecureAuthSystem"
     ISSUER = "SecureAuth"
     ACCOUNT_NAME = "admin"
+
+# Create TOTP instance for production mode
+if PRODUCTION_MODE:
+    totp_generator = pyotp.TOTP(TOTP_SECRET)
 
 
 class SetupWindow:
@@ -419,8 +425,8 @@ class SecureAuthApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Secure Authentication System")
-        self.root.geometry("550x700")
-        self.root.resizable(False, False)
+        self.root.geometry("550x750")  # Increased height
+        self.root.resizable(True, True)  # Allow resizing
         
         # State variables
         self.login_attempts = 0
@@ -495,7 +501,7 @@ class SecureAuthApp:
         
         # Glass panel container
         glass_container = tk.Frame(self.bg_canvas, bg="white")
-        glass_container.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=480, height=600)
+        glass_container.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=480, height=680)  # Increased height for banner
         
         # Simulate glass effect with semi-transparent white
         glass_bg = tk.Frame(glass_container, bg="#FAFAFA")
@@ -514,9 +520,9 @@ class SecureAuthApp:
         bottom_frame = tk.Frame(glass_bg, bg="#FAFAFA")
         bottom_frame.pack(fill=tk.X, pady=(10, 20), padx=20)
         
+        
         # Conditional TOTP display based on mode
         if not PRODUCTION_MODE:
-            # Demo Mode: Show current TOTP
             totp_glass = tk.Frame(bottom_frame, bg="#FFF9E6", 
                                  highlightthickness=1, highlightbackground="#FFD700")
             totp_glass.pack(fill=tk.X, pady=(0, 8))
@@ -793,8 +799,7 @@ class SecureAuthApp:
     def copy_demo_totp(self):
         """Copy current TOTP to clipboard"""
         try:
-            code = self.lib.get_current_totp()
-            totp_code = f"{code:06d}"
+            totp_code = self.get_current_totp_code()
             self.root.clipboard_clear()
             self.root.clipboard_append(totp_code)
             self.log_label.config(text="✓ TOTP copied to clipboard!", fg="#107C10")
@@ -806,8 +811,8 @@ class SecureAuthApp:
             # Reset message after 2 seconds
             self.root.after(2000, lambda: self.log_label.config(
                 text="● System Ready | Secure Connection Active", fg="#666666"))
-        except:
-            messagebox.showerror("Error", "Failed to copy TOTP")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to copy TOTP: {e}")
 
     def update_totp_countdown(self):
         """Update the circular TOTP countdown timer"""
@@ -876,9 +881,9 @@ class SecureAuthApp:
             messagebox.showerror("Invalid Code", "Code must be exactly 6 digits.")
             return
             
-        code = int(code_str)
         try:
-            if self.lib.validate_totp(code):
+            # Use dual-mode verification
+            if self.verify_totp_code(code_str):
                 # Success animation
                 self.log_label.config(text="✓ Authentication Complete!", fg="#107C10")
                 messagebox.showinfo("Success", "✓ Authentication Complete!\n\nAccess Granted.\n\nWelcome to the secure system!")
@@ -899,6 +904,32 @@ class SecureAuthApp:
                 self.totp_debug_label.config(text="🔔 Current Valid TOTP: Error")
         
         self.root.after(1000, self.update_demo_totp)
+    
+    def get_current_totp_code(self):
+        """Get current TOTP code based on mode"""
+        if PRODUCTION_MODE:
+            # Use pyotp for RFC 6238 standard TOTP
+            return totp_generator.now()
+        else:
+            # Use C++ backend for demo mode
+            if self.lib:
+                return f"{self.lib.get_current_totp():06d}"
+            return "000000"
+    
+    def verify_totp_code(self, user_code):
+        """Verify TOTP code based on mode"""
+        if PRODUCTION_MODE:
+            # Use pyotp for RFC 6238 standard verification
+            return totp_generator.verify(user_code, valid_window=1)
+        else:
+            # Use C++ backend for demo mode
+            if self.lib:
+                try:
+                    code_int = int(user_code)
+                    return self.lib.validate_totp(code_int)
+                except:
+                    return False
+            return False
 
 
 if __name__ == "__main__":
