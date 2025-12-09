@@ -36,6 +36,18 @@ A production-ready, secure authentication module featuring **Multi-Factor Authen
 - **Input Validation** - Real-time validation with user feedback
 - **Strict TOTP Verification** - 30-second window with ±1 tolerance
 
+### 📊 Audit Logging & Intrusion Detection
+- **Complete Audit Trail** - Logs all authentication events (login, TOTP, registration)
+- **Real-Time Intrusion Detection** - Automatic detection of suspicious patterns:
+  - Brute force attacks (5+ failures in 15 minutes)
+  - Rapid-fire attempts (10+ attempts in 1 minute)
+  - Unusual timing patterns (attacks at odd hours)
+- **Risk Assessment** - Automatic risk level calculation (LOW/MEDIUM/HIGH/CRITICAL)
+- **Security Alerts** - Real-time alerts with severity levels
+- **Forensic Analysis** - Export logs for security investigations
+- **Audit Viewer CLI** - Command-line tool for log analysis
+- **User Activity Tracking** - Complete history per user
+
 ### 📱 Production & Demo Modes
 
 ### 🪟 Windows OS Integration
@@ -212,6 +224,43 @@ Try different passwords to see the strength meter in action:
 **Step 3: Success!**
 ✓ Authentication Complete - Access Granted!
 
+## 📊 Audit Logging & Security Monitoring
+
+### View Audit Logs
+```bash
+# Interactive audit viewer
+python audit_viewer.py
+
+# View summary
+python audit_viewer.py summary
+
+# Check security alerts
+python audit_viewer.py alerts
+
+# View specific user activity
+python audit_viewer.py user <username>
+
+# Export logs for analysis
+python audit_viewer.py export audit_report.json
+```
+
+### What Gets Logged
+- ✅ **All Login Attempts** (success & failure)
+- ✅ **TOTP Verifications** (valid & invalid codes)
+- ✅ **User Registrations** (new account creation)
+- ✅ **Account Lockouts** (after max failed attempts)
+- ✅ **Risk Levels** (LOW/MEDIUM/HIGH/CRITICAL)
+
+### Intrusion Detection
+The system automatically detects:
+- 🚨 **Brute Force Attacks**: 5+ failed logins in 15 minutes
+- 🚨 **Rapid-Fire Attempts**: 10+ attempts in 1 minute (bot detected)
+- 🚨 **Unusual Timing**: Multiple failures at odd hours (2 AM - 6 AM)
+
+Alerts are generated in real-time and can be viewed with `audit_viewer.py alerts`.
+
+**See [AUDIT_LOGGING.md](AUDIT_LOGGING.md) for complete documentation.**
+
 ## 🔍 How Google Authenticator Works
 
 ### The Technology: RFC 6238 TOTP
@@ -242,8 +291,10 @@ SecureAuthProject/
 │
 ├── config.py                           # Configuration settings
 ├── user_db.py                          # SQLite user management
+├── audit_log.py                        # Audit logging & intrusion detection (NEW)
 ├── main_gui.py                         # Python GUI application
 ├── users.db                            # SQLite database (auto-created)
+├── audit_log.db                        # Audit log database (auto-created)
 │
 ├── auth_core.cpp                       # C++ security backend (optional)
 ├── build.py                            # Build script
@@ -252,6 +303,9 @@ SecureAuthProject/
 ├── provider.def                        # DLL exports definition
 ├── WINDOWS_OS_INTEGRATION.md           # OS integration documentation
 ├── BUILD_INSTRUCTIONS.md               # Credential provider build guide
+│
+├── audit_viewer.py                     # Audit log viewer CLI tool (NEW)
+├── AUDIT_LOGGING.md                    # Audit system documentation (NEW)
 │
 ├── README.md                           # Main documentation
 ├── SETUP_GUIDE.md                      # Google Authenticator guide
@@ -373,6 +427,9 @@ For detailed technical information, see:
 ✅ **User Sign-Up System** 👤  
 ✅ **SQLite Database Persistence** 🗄️  
 ✅ **Per-User TOTP Secrets** 🔐  
+✅ **Windows OS Integration** (reference implementation) 🪟  
+✅ **Audit Logging & Intrusion Detection** 📊  
+✅ **Real-Time Security Alerts** 🚨  
 ✅ **Demo mode with visible codes**  
 ✅ Login attempt tracking (max 5)  
 ✅ Copy-to-clipboard with visual confirmation  
@@ -389,7 +446,8 @@ For detailed technical information, see:
 - [ ] Session management with timeout
 - [ ] Biometric authentication simulation
 - [ ] Multi-language support
-- [ ] Export authentication logs
+- [ ] ML-based anomaly detection in audit logs
+- [ ] Real-time dashboard for security monitoring
 - [ ] Database encryption at rest
 
 ## 👨‍💻 Author
