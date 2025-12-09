@@ -1,0 +1,10 @@
+; Windows Credential Provider Module Definition File
+; Defines exported functions for DLL
+
+LIBRARY SecureAuthProvider
+
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE

@@ -1,6 +1,6 @@
 # 🔐 Secure Authentication System
 
-A modern, secure authentication system featuring **Multi-Factor Authentication (MFA)** with a stunning **Windows 11-inspired glass UI**. Built with C++ backend for security and Python frontend for a premium user experience.
+A production-ready, secure authentication module featuring **Multi-Factor Authentication (MFA)** with **Windows OS integration**. Includes a modern Windows 11-style GUI, SQLite database, and a reference implementation of a Windows Credential Provider for OS-level authentication.
 
 ![Windows 11 Design](https://img.shields.io/badge/Design-Windows%2011-0078D4?style=flat-square)
 ![C++](https://img.shields.io/badge/Backend-C%2B%2B-00599C?style=flat-square&logo=cplusplus)
@@ -35,6 +35,20 @@ A modern, secure authentication system featuring **Multi-Factor Authentication (
 - **Account Lockout** - Automatic lock after 5 failed attempts
 - **Input Validation** - Real-time validation with user feedback
 - **Strict TOTP Verification** - 30-second window with ±1 tolerance
+
+### 📱 Production & Demo Modes
+
+### 🪟 Windows OS Integration
+
+**Reference Implementation** (Educational):
+- Windows Credential Provider (C++) for OS-level login
+- Integrates with Windows authentication subsystem
+- Runs at SYSTEM privilege level
+- Replaces standard Windows login screen
+- Uses same SQLite database as Python GUI
+- **Full documentation in** [`WINDOWS_OS_INTEGRATION.md`](WINDOWS_OS_INTEGRATION.md)
+
+> **⚠️ Note**: The credential provider is a reference implementation showing how to integrate with Windows OS. It demonstrates OS-level authentication but should only be built/tested in a VM. The Python GUI is fully production-ready for standalone use.
 
 ### 📱 Production & Demo Modes
 
@@ -226,17 +240,24 @@ Try different passwords to see the strength meter in action:
 ```
 SecureAuthProject/
 │
-├── config.py                  # Production/Demo mode configuration
-├── user_db.py                 # SQLite user database module (NEW)
-├── auth_core.cpp              # C++ security backend (optional/legacy)
-├── main_gui.py                # Python GUI with glass effects
-├── build.py                   # Automated build script
-├── users.db                   # SQLite database (auto-created)
-├── .gitignore                 # Git ignore file
-├── README.md                  # This file
-├── SETUP_GUIDE.md             # Google Authenticator guide
-├── TECHNICAL_DOCUMENTATION.txt # Comprehensive docs
-└── ALL_SOURCE_CODE.txt        # Complete source listing
+├── config.py                           # Configuration settings
+├── user_db.py                          # SQLite user management
+├── main_gui.py                         # Python GUI application
+├── users.db                            # SQLite database (auto-created)
+│
+├── auth_core.cpp                       # C++ security backend (optional)
+├── build.py                            # Build script
+│
+├── windows_credential_provider.cpp     # Windows OS integration (reference)
+├── provider.def                        # DLL exports definition
+├── WINDOWS_OS_INTEGRATION.md           # OS integration documentation
+├── BUILD_INSTRUCTIONS.md               # Credential provider build guide
+│
+├── README.md                           # Main documentation
+├── SETUP_GUIDE.md                      # Google Authenticator guide
+├── TECHNICAL_DOCUMENTATION.txt         # Comprehensive technical docs
+├── ALL_SOURCE_CODE.txt                 # Complete source listing
+└── .gitignore                          # Git ignore file
 ```
 
 ## 🎨 UI Components
