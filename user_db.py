@@ -7,6 +7,7 @@ import sqlite3
 import hashlib
 import pyotp
 import os
+import audit_log  # Audit logging integration
 
 DB_FILENAME = "users.db"
 
@@ -70,8 +71,24 @@ def register_user(username, password):
         )
         conn.commit()
         conn.close()
+        
+        # Audit log: Successful registration
+        audit_log.log_event(
+            username=username,
+            event_type="REGISTRATION",
+            status="SUCCESS",
+            details={"secret_generated": True}
+        )
+        
         return True, "Registration successful", totp_secret
     except Exception as e:
+        # Audit log: Failed registration
+        audit_log.log_event(
+            username=username,
+            event_type="REGISTRATION",
+            status="FAILURE",
+            details={"error": str(e)}
+        )
         return False, f"Database error: {str(e)}", None
 
 
@@ -81,6 +98,12 @@ def validate_credentials(username, password):
     Returns True if credentials are valid, False otherwise.
     """
     if not username or not password:
+        audit_log.log_event(
+            username=username or "EMPTY",
+            event_type="LOGIN",
+            status="FAILURE",
+            details={"reason": "empty_credentials"}
+        )
         return False
     
     pwd_hash = hash_password(password)
@@ -96,9 +119,30 @@ def validate_credentials(username, password):
         conn.close()
         
         if result and result[0] == pwd_hash:
+            # Audit log: Successful login (password stage)
+            audit_log.log_event(
+                username=username,
+                event_type="LOGIN",
+                status="SUCCESS",
+                details={"stage": "password_verified"}
+            )
             return True
-        return False
-    except Exception:
+        else:
+            # Audit log: Failed login
+            audit_log.log_event(
+                username=username,
+                event_type="LOGIN",
+                status="FAILURE",
+                details={"reason": "invalid_credentials"}
+            )
+            return False
+    except Exception as e:
+        audit_log.log_event(
+            username=username,
+            event_type="LOGIN",
+            status="FAILURE",
+            details={"reason": "database_error", "error": str(e)}
+        )
         return False
 
 
@@ -147,12 +191,43 @@ def verify_totp(username, totp_code):
     """
     secret = get_user_secret(username)
     if not secret:
+        audit_log.log_event(
+            username=username,
+            event_type="TOTP",
+            status="FAILURE",
+            details={"reason": "no_secret_found"}
+        )
         return False
     
     try:
         totp = pyotp.TOTP(secret)
-        return totp.verify(totp_code, valid_window=1)
-    except Exception:
+        is_valid = totp.verify(totp_code, valid_window=1)
+        
+        if is_valid:
+            # Audit log: Successful TOTP verification
+            audit_log.log_event(
+                username=username,
+                event_type="TOTP",
+                status="SUCCESS",
+                details={"mfa_completed": True}
+            )
+        else:
+            # Audit log: Failed TOTP verification
+            audit_log.log_event(
+                username=username,
+                event_type="TOTP",
+                status="FAILURE",
+                details={"reason": "invalid_totp_code"}
+            )
+        
+        return is_valid
+    except Exception as e:
+        audit_log.log_event(
+            username=username,
+            event_type="TOTP",
+            status="FAILURE",
+            details={"reason": "verification_error", "error": str(e)}
+        )
         return False
 
 
