@@ -16,16 +16,25 @@ A modern, secure authentication system featuring **Multi-Factor Authentication (
 - **TOTP Countdown Timer** - Circular progress ring showing code expiry (strict 30-second validation)
 - **Login Attempt Tracker** - Visual security warnings and account lockout (max 5 attempts)
 - **Smooth Animations** - Micro-interactions and hover effects throughout
+- **Sign-Up Flow** - User-friendly registration with QR code setup
+
+### 🗄️ Database & User Management
+- **SQLite Database** - Persistent user storage in `users.db`
+- **User Registration** - Create new accounts with username and password
+- **Per-User TOTP Secrets** - Each user gets unique authenticator secret
+- **Password Requirements** - Minimum 3-char username, 6-char password
+- **Duplicate Detection** - Prevents duplicate usernames
 
 ### 🔒 Security Features
 - **Two-Factor Authentication** - Time-based One-Time Passwords (TOTP)
 - **Google Authenticator Support** - RFC 6238 compliant TOTP with QR code setup
+- **Per-User Secrets** - Unique TOTP secret for each registered user
+- **Password Hashing** - SHA-256 for credential storage
 - **Production/Demo Modes** - Toggle between Google Auth and visible codes
 - **Buffer Overflow Protection** - Secure string handling in C++
-- **Password Hashing** - DJB2 algorithm implementation
 - **Account Lockout** - Automatic lock after 5 failed attempts
 - **Input Validation** - Real-time validation with user feedback
-- **Strict TOTP Validation** - 30-second window, old codes expire immediately
+- **Strict TOTP Verification** - 30-second window with ±1 tolerance
 
 ### 📱 Production & Demo Modes
 
@@ -73,12 +82,16 @@ pip install qrcode[pil] pyotp
 
 # Build and run (compiles C++ library and launches GUI)
 python build.py
+# OR run GUI directly (Python-only mode)
+python main_gui.py
 ```
 
+**Note**: The C++ library is now optional - the application works with Python-only authentication using SQLite database.
+
 That's it! The system will:
-1. Compile the C++ backend library
+1. Initialize the SQLite database (`users.db`) if needed
 2. Launch the modern glass UI
-3. Display the authentication screens
+3. Display the login/sign-up screens
 
 ## 📱 Google Authenticator Setup
 
@@ -115,64 +128,74 @@ If you can't scan the QR code:
 - Key: `JBSWY3DPEHPK3PXP`
 - Type: Time based
 
-## 🔑 Test Credentials
+## 🔑 Getting Started
 
-| Field | Value |
-|-------|-------|
-| **Username** | `admin` |
-| **Password** | `admin123` |
-| **TOTP Code** | From Google Authenticator app (production) OR yellow banner (demo) |
+### First Time Setup - Create an Account
 
-**Production Mode Secret**: `JBSWY3DPEHPK3PXP` (Base32)  
-**Demo Mode Secret**: `MY_SUPER_SECRET_KEY`
+1. **Launch the application**:
+   ```bash
+   python main_gui.py
+   ```
+
+2. **Click "Create Account"** on the login screen
+
+3. **Sign Up**:
+   - Enter username (min 3 characters)
+   - Enter password (min 6 characters)
+   - Watch the password strength meter update
+
+4. **Scan QR Code**:
+   - A QR code will appear for Google Authenticator
+   - Open Google Authenticator app on your phone
+   - Tap **+** → **Scan QR code**
+   - Point camera at the QR code on screen
+   - Your account is now added!
+
+5. **Login**:
+   - Click "Done - Go to Login"
+   - Enter your username and password
+   - Enter the 6-digit TOTP code from Google Authenticator
+   - Success!
 
 ### Password Strength Testing
 Try different passwords to see the strength meter in action:
 - `weak` → 🔴 Red (Weak)
-- `Admin123` → 🟡 Yellow (Good)
-- `Admin123!@#` → 🟢 Green (Strong)
+- `Pass123` → 🟡 Yellow (Good)
+- `Pass123!@#` → 🟢 Green (Very Strong)
 
 ## 🎯 How to Use
 
-### Demo Mode (Default - Codes Visible)
+### Sign Up Flow
+
+**Step 1: Create Account**
+1. Click **"Create Account"** on login screen
+2. Enter desired username (min 3 characters)
+3. Enter password (min 6 characters)
+4. Watch password strength meter update in real-time
+5. Click **"Sign Up"**
+
+**Step 2: Setup Google Authenticator**
+1. QR code screen appears automatically
+2. Open Google Authenticator app
+3. Scan the displayed QR code
+4. Your account is added to the app!
+5. Click **"Done - Go to Login"**
+
+### Login Flow
 
 **Step 1: Login**
-1. Enter username: `admin`
-2. Enter password: `admin123`
-3. Watch the password strength meter update
-4. Press `Enter` or click **Sign In →**
+1. Enter your username
+2. Enter your password
+3. Press `Enter` or click **Sign In →**
 
 **Step 2: MFA Verification**
-1. See the TOTP countdown timer (shows time remaining)
-2. Copy the 6-digit code from the **yellow banner**
-3. Or click **📋 Copy Demo TOTP** button
-4. Enter the code in the verification field
+1. Open Google Authenticator app on your phone
+2. Find your SecureAuth account entry
+3. See the 6-digit code (changes every 30 seconds)
+4. Enter this code in the verification field
 5. Press `Enter` or click **Verify Code ✓**
 
 **Step 3: Success!**
-✓ Authentication Complete - Access Granted!
-
-### Production Mode (Google Authenticator)
-
-**Step 1: Setup Google Auth** (first time only)
-1. Set `PRODUCTION_MODE = True` in `config.py`
-2. Run `python build.py`
-3. Click **"⚙️ Setup Authenticator"** (blue banner)
-4. Scan QR code with Google Authenticator app
-
-**Step 2: Login**
-1. Enter username: `admin`
-2. Enter password: `admin123`
-3. Press `Enter` or click **Sign In →**
-
-**Step 3: MFA Verification**
-1. Open Google Authenticator app on your phone
-2. Find "SecureAuth (admin)" account
-3. See the 6-digit code (e.g., 123456)
-4. Enter this code in the app
-5. Press `Enter` or click **Verify Code ✓**
-
-**Step 4: Success!**
 ✓ Authentication Complete - Access Granted!
 
 ## 🔍 How Google Authenticator Works
@@ -204,9 +227,11 @@ Try different passwords to see the strength meter in action:
 SecureAuthProject/
 │
 ├── config.py                  # Production/Demo mode configuration
-├── auth_core.cpp              # C++ security backend
+├── user_db.py                 # SQLite user database module (NEW)
+├── auth_core.cpp              # C++ security backend (optional/legacy)
 ├── main_gui.py                # Python GUI with glass effects
 ├── build.py                   # Automated build script
+├── users.db                   # SQLite database (auto-created)
 ├── .gitignore                 # Git ignore file
 ├── README.md                  # This file
 ├── SETUP_GUIDE.md             # Google Authenticator guide
@@ -236,27 +261,37 @@ SecureAuthProject/
 
 ## 🔧 Technical Details
 
-### Backend (C++)
-- **DJB2 Hashing** - Password verification
+### Database (SQLite)
+- **user_db.py** - User database management module
+- **users.db** - Auto-created SQLite database file
+- **Schema**: `users(username TEXT PRIMARY KEY, password_hash TEXT, totp_secret TEXT)`
+- **SHA-256 Hashing** - Password storage
+- **Base32 Secrets** - TOTP secret generation using `pyotp.random_base32()`
+- **Validation Functions** - Credential verification, TOTP verification
+
+### Backend (C++) - Optional/Legacy
+- **DJB2 Hashing** - Legacy password verification  
 - **TOTP Generation (Demo)** - Simplified algorithm for demo mode
 - **Buffer Protection** - Secure string copy functions
 - **Cross-platform** - Compiled as .dll (Windows) or .so (Linux/Mac)
 
 ### Frontend (Python)
 - **tkinter** - GUI framework
-- **ctypes** - C++ library integration
-- **pyotp** - RFC 6238 TOTP for production mode
+- **SQLite3** - Built-in database (no installation needed)
+- **pyotp** - RFC 6238 TOTP implementation
 - **qrcode** - QR code generation for Google Authenticator
+- **hashlib** - SHA-256 password hashing
 - **Glass Effect** - Simulated with stipple patterns
 - **Animations** - Math-based gradient animation
 - **Windows 11 Theme** - Segoe UI font, modern colors
 
 ### How Production Mode Works
-1. **QR Code Generation**: Creates `otpauth://` URI with Base32 secret
-2. **TOTP Algorithm**: Uses HMAC-SHA1 (RFC 6238 standard)
-3. **Time Windows**: 30-second intervals
-4. **Verification**: Checks current window ±1 for time drift tolerance
-5. **Library**: Uses battle-tested `pyotp` Python library
+1. **User Registration**: Generates unique Base32 TOTP secret
+2. **QR Code Generation**: Creates `otpauth://` URI with user-specific secret
+3. **TOTP Algorithm**: Uses HMAC-SHA1 (RFC 6238 standard via pyotp)
+4. **Time Windows**: 30-second intervals
+5. **Verification**: Checks current window ±1 for time drift tolerance
+6. **Database Storage**: Encrypted storage in SQLite3
 
 ### Colors
 - **Primary Blue**: `#0078D4` (Windows accent)
@@ -268,24 +303,30 @@ SecureAuthProject/
 ## 🛡️ Security Notes
 
 > **⚠️ Educational Purpose**: This project demonstrates MFA concepts. For production use:
-> - Replace DJB2 with bcrypt/Argon2 ✅ *Production mode uses RFC 6238 TOTP*
-> - Use unique secrets per user (current: shared demo secret)
-> - Add persistent rate limiting
-> - Implement secure credential storage
-> - Use constant-time comparisons
-> - Store secrets encrypted, not in config files
+> - ✅ Uses SHA-256 password hashing (better than DJB2)
+> - ✅ Per-user TOTP secrets (unique for each account)
+> - ✅ RFC 6238 compliant TOTP
+> - ⚠️ Consider bcrypt/Argon2 for password hashing
+> - ⚠️ Add persistent rate limiting beyond session
+> - ⚠️ Implement password reset functionality
+> - ⚠️ Add email verification
+> - ⚠️ Store database encrypted at rest
 
 **What's Production-Ready:**
 - ✅ RFC 6238 TOTP (industry standard)
 - ✅ Google Authenticator compatible
-- ✅ Buffer overflow protection
+- ✅ Per-user TOTP secrets
+- ✅ SQLite database persistence
+- ✅ SHA-256 password hashing
+- ✅ Buffer overflow protection (C++ optional)
 - ✅ Account lockout mechanism
 - ✅ Input validation
 
-**What's For Demo:**
-- ⚠️ Hardcoded credentials
-- ⚠️ Shared TOTP secret
-- ⚠️ DJB2 hash (educational, not cryptographic)
+**What's For Demo/Learning:**
+- ⚠️ SHA-256 (not as strong as bcrypt/Argon2)
+- ⚠️ No password reset
+- ⚠️ No email verification
+- ⚠️ Database not encrypted at rest
 
 ## 📖 Documentation
 
@@ -308,6 +349,9 @@ For detailed technical information, see:
 ✅ **Production mode with Google Authenticator** 📱  
 ✅ **RFC 6238 compliant TOTP**  
 ✅ **QR code setup for easy configuration**  
+✅ **User Sign-Up System** 👤  
+✅ **SQLite Database Persistence** 🗄️  
+✅ **Per-User TOTP Secrets** 🔐  
 ✅ **Demo mode with visible codes**  
 ✅ Login attempt tracking (max 5)  
 ✅ Copy-to-clipboard with visual confirmation  
@@ -319,13 +363,13 @@ For detailed technical information, see:
 ## 🔮 Future Enhancements
 
 - [ ] Dark mode toggle
-- [x] ~~QR code for TOTP setup~~ ✅ **COMPLETED!**
-- [x] ~~Google Authenticator support~~ ✅ **COMPLETED!**
-- [ ] Per-user TOTP secrets
-- [ ] Session management
+- [ ] Password reset functionality
+- [ ] Email verification
+- [ ] Session management with timeout
 - [ ] Biometric authentication simulation
 - [ ] Multi-language support
 - [ ] Export authentication logs
+- [ ] Database encryption at rest
 
 ## 👨‍💻 Author
 
