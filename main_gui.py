@@ -9,6 +9,7 @@ import math
 import qrcode
 from PIL import Image, ImageTk
 import pyotp
+import user_db
 
 # Import configuration
 try:
@@ -29,12 +30,16 @@ if PRODUCTION_MODE:
 
 class SetupWindow:
     """Window for Google Authenticator setup with QR code"""
-    def __init__(self, parent):
+    def __init__(self, parent, totp_secret=None, username="User"):
         self.window = tk.Toplevel(parent)
         self.window.title("Google Authenticator Setup")
         self.window.geometry("500x650")
         self.window.resizable(False, False)
         self.window.config(bg="#FFFFFF")
+        
+        # Store custom secret and username
+        self.totp_secret = totp_secret if totp_secret else TOTP_SECRET
+        self.username = username
         
         # Make modal
         self.window.transient(parent)
@@ -102,7 +107,7 @@ class SetupWindow:
         
         secret_label = tk.Label(
             secret_frame,
-            text=f"Secret Key: {TOTP_SECRET}",
+            text=f"Secret Key: {self.totp_secret}",
             font=("Consolas", 10, "bold"),
             fg="#0078D4",
             bg="#FFFFFF"
@@ -151,7 +156,7 @@ class SetupWindow:
         """Generate QR code for Google Authenticator"""
         # Create TOTP URI
         # Format: otpauth://totp/ISSUER:ACCOUNT?secret=SECRET&issuer=ISSUER
-        totp_uri = f"otpauth://totp/{ISSUER}:{ACCOUNT_NAME}?secret={TOTP_SECRET}&issuer={ISSUER}"
+        totp_uri = f"otpauth://totp/{ISSUER}:{self.username}?secret={self.totp_secret}&issuer={ISSUER}"
         
         # Generate QR code
         qr = qrcode.QRCode(
@@ -432,6 +437,8 @@ class SecureAuthApp:
         self.login_attempts = 0
         self.max_attempts = 5
         self.animation_alpha = 0
+        self.current_username = None  # Store logged-in username
+        self.pending_signup_secret = None  # Store secret during signup
         
         # Animated gradient background
         self.setup_animated_background()
@@ -439,7 +446,7 @@ class SecureAuthApp:
         self.lib = self.load_library()
         
         # UI State
-        self.current_stage = 1
+        self.current_stage = 1  # 1: Login, 2: MFA, 3: Signup, 4: QR Setup
         
         # Setup UI
         self.setup_ui()
@@ -472,13 +479,16 @@ class SecureAuthApp:
         self.root.after(50, self.animate_background)
 
     def load_library(self):
+        """Load C++ library (optional - only needed for legacy demo TOTP)"""
         system = platform.system()
         lib_name = "auth_lib.dll" if system == "Windows" else "auth_lib.so"
         lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), lib_name)
         
+        # Library is optional now - we use Python DB for authentication
         if not os.path.exists(lib_path):
-            messagebox.showerror("Error", f"Library not found: {lib_path}\nPlease run build.py first.")
-            sys.exit(1)
+            print(f"Note: C++ library not found at {lib_path}")
+            print("Using Python-only authentication (this is normal)")
+            return None
             
         try:
             lib = ctypes.CDLL(lib_path)
@@ -490,8 +500,9 @@ class SecureAuthApp:
             lib.validate_totp.restype = ctypes.c_bool
             return lib
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to load library: {e}")
-            sys.exit(1)
+            print(f"Note: Could not load C++ library: {e}")
+            print("Using Python-only authentication (this is normal)")
+            return None
 
     def setup_ui(self):
         # Clear existing (except background)
@@ -512,8 +523,12 @@ class SecureAuthApp:
         
         if self.current_stage == 1:
             self.setup_login_screen(glass_bg)
-        else:
+        elif self.current_stage == 2:
             self.setup_mfa_screen(glass_bg)
+        elif self.current_stage == 3:
+            self.setup_signup_screen(glass_bg)
+        elif self.current_stage == 4:
+            self.setup_qr_setup_screen(glass_bg)
         
         
         # Bottom info section
@@ -657,15 +672,6 @@ class SecureAuthApp:
         self.password_entry = ModernEntry(form_container, placeholder="Enter your password", show="●")
         self.password_entry.pack(fill=tk.X, ipady=2)
         
-        # Password strength meter
-        tk.Frame(form_container, bg="#FAFAFA", height=8).pack()
-        self.strength_meter = PasswordStrengthMeter(form_container, bg="#FAFAFA")
-        self.strength_meter.pack(fill=tk.X)
-        
-        # Update strength on password change
-        self.password_entry.entry.bind("<KeyRelease>", 
-            lambda e: self.strength_meter.update_strength(self.password_entry.get()))
-        
         # Keyboard shortcut - Enter to login
         self.password_entry.entry.bind("<Return>", lambda e: self.handle_login())
         
@@ -680,6 +686,18 @@ class SecureAuthApp:
             bg="#FAFAFA"
         )
         self.login_btn.pack(fill=tk.X, pady=(5, 0))
+        
+        # Create Account button
+        tk.Frame(form_container, bg="#FAFAFA", height=10).pack()
+        
+        create_btn = ModernButton(
+            form_container,
+            text="Create Account",
+            command=self.switch_to_signup,
+            primary=False,
+            bg="#FAFAFA"
+        )
+        create_btn.pack(fill=tk.X)
         
         # Keyboard shortcut hint
         hint = tk.Label(
@@ -796,6 +814,196 @@ class SecureAuthApp:
         
         tk.Frame(parent, bg="#FAFAFA", height=30).pack()
 
+    def setup_signup_screen(self, parent):
+        """Sign Up Screen"""
+        # Top spacing
+        tk.Frame(parent, bg="#FAFAFA", height=35).pack()
+        
+        # Icon with glow effect
+        icon_frame = tk.Frame(parent, bg="#FAFAFA")
+        icon_frame.pack(pady=(0, 10))
+        
+        icon_label = tk.Label(
+            icon_frame,
+            text="👤",
+            font=("Segoe UI", 52),
+            bg="#FAFAFA"
+        )
+        icon_label.pack()
+        
+        # Title with modern typography
+        title = tk.Label(
+            parent,
+            text="Create Account",
+            font=("Segoe UI Light", 28),
+            fg="#1A1A1A",
+            bg="#FAFAFA"
+        )
+        title.pack(pady=(0, 5))
+        
+        # Subtitle
+        subtitle = tk.Label(
+            parent,
+            text="Sign up for secure two-factor authentication",
+            font=("Segoe UI", 11),
+            fg="#666666",
+            bg="#FAFAFA"
+        )
+        subtitle.pack(pady=(0, 30))
+        
+        # Form container
+        form_container = tk.Frame(parent, bg="#FAFAFA")
+        form_container.pack(fill=tk.BOTH, expand=True, padx=50)
+        
+        # Username
+        username_label = tk.Label(
+            form_container,
+            text="Username",
+            font=("Segoe UI Semibold", 10),
+            fg="#1A1A1A",
+            bg="#FAFAFA",
+            anchor="w"
+        )
+        username_label.pack(fill=tk.X, pady=(0, 6))
+        
+        self.signup_username_entry = ModernEntry(form_container, placeholder="Choose a username")
+        self.signup_username_entry.pack(fill=tk.X, ipady=2)
+        self.signup_username_entry.entry.focus_set()  # Auto-focus
+        
+        # Password
+        password_label = tk.Label(
+            form_container,
+            text="Password",
+            font=("Segoe UI Semibold", 10),
+            fg="#1A1A1A",
+            bg="#FAFAFA",
+            anchor="w"
+        )
+        password_label.pack(fill=tk.X, pady=(18, 6))
+        
+        self.signup_password_entry = ModernEntry(form_container, placeholder="Choose a strong password", show="●")
+        self.signup_password_entry.pack(fill=tk.X, ipady=2)
+        
+        # Password strength meter
+        tk.Frame(form_container, bg="#FAFAFA", height=8).pack()
+        self.signup_strength_meter = PasswordStrengthMeter(form_container, bg="#FAFAFA")
+        self.signup_strength_meter.pack(fill=tk.X)
+        
+        # Update strength on password change
+        self.signup_password_entry.entry.bind("<KeyRelease>", 
+            lambda e: self.signup_strength_meter.update_strength(self.signup_password_entry.get()))
+        
+        # Keyboard shortcut - Enter to signup
+        self.signup_password_entry.entry.bind("<Return>", lambda e: self.handle_signup())
+        
+        # Sign Up button
+        tk.Frame(form_container, bg="#FAFAFA", height=25).pack()
+        
+        self.signup_btn = ModernButton(
+            form_container,
+            text="Sign Up  →",
+            command=self.handle_signup,
+            primary=True,
+            bg="#FAFAFA"
+        )
+        self.signup_btn.pack(fill=tk.X, pady=(5, 0))
+        
+        # Back to login button
+        tk.Frame(form_container, bg="#FAFAFA", height=10).pack()
+        
+        back_btn = ModernButton(
+            form_container,
+            text="← Back to Login",
+            command=self.switch_to_login,
+            primary=False,
+            bg="#FAFAFA"
+        )
+        back_btn.pack(fill=tk.X)
+        
+        tk.Frame(parent, bg="#FAFAFA", height=30).pack()
+
+    def setup_qr_setup_screen(self, parent):
+        """QR Code Setup Screen (shown after registration)"""
+        # Top spacing
+        tk.Frame(parent, bg="#FAFAFA", height=20).pack()
+        
+        # Title
+        title = tk.Label(
+            parent,
+            text="📱 Setup Authenticator",
+            font=("Segoe UI Light", 24),
+            fg="#1A1A1A",
+            bg="#FAFAFA"
+        )
+        title.pack(pady=(0, 10))
+        
+        # Instructions
+        instructions = tk.Label(
+            parent,
+            text="Scan this QR code with Google Authenticator:",
+            font=("Segoe UI", 11),
+            fg="#666666",
+            bg="#FAFAFA"
+        )
+        instructions.pack(pady=(0, 15))
+        
+        # Generate and display QR code
+        qr_frame = tk.Frame(parent, bg="#FAFAFA")
+        qr_frame.pack(pady=(0, 20))
+        
+        qr_image = self.generate_qr_for_user(self.current_username, self.pending_signup_secret)
+        qr_label = tk.Label(qr_frame, image=qr_image, bg="#FAFAFA")
+        qr_label.image = qr_image  # Keep reference
+        qr_label.pack()
+        
+        # Secret display (in case QR doesn't work)
+        secret_frame = tk.Frame(parent, bg="#F5F5F5", highlightthickness=1, highlightbackground="#E0E0E0")
+        secret_frame.pack(fill=tk.X, padx=50, pady=(10, 20))
+        
+        secret_label = tk.Label(
+            secret_frame,
+            text=f"Secret Key: {self.pending_signup_secret}",
+            font=("Consolas", 9, "bold"),
+            fg="#0078D4",
+            bg="#F5F5F5"
+        )
+        secret_label.pack(pady=8)
+        
+        # Continue button
+        continue_btn = ModernButton(
+            parent,
+            text="Done - Go to Login  →",
+            command=self.finish_signup,
+            primary=True,
+            bg="#FAFAFA"
+        )
+        continue_btn.pack(padx=50, fill=tk.X, pady=(10, 20))
+        
+        tk.Frame(parent, bg="#FAFAFA", height=20).pack()
+
+    def generate_qr_for_user(self, username, secret):
+        """Generate QR code for a specific user's TOTP secret"""
+        totp_uri = f"otpauth://totp/{ISSUER}:{username}?secret={secret}&issuer={ISSUER}"
+        
+       # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=8,
+            border=2,
+        )
+        qr.add_data(totp_uri)
+        qr.make(fit=True)
+        
+        # Create image
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to PhotoImage for tkinter
+        qr_photo = ImageTk.PhotoImage(qr_image)
+        
+        return qr_photo
+
+
     def copy_demo_totp(self):
         """Copy current TOTP to clipboard"""
         try:
@@ -846,13 +1054,11 @@ class SecureAuthApp:
         else:
             self.log_label.config(text="● Processing authentication...", fg="#0078D4")
 
-        # Convert to bytes
-        u_bytes = username.encode('utf-8')
-        p_bytes = password.encode('utf-8')
-        
+        # Validate credentials using database
         try:
-            if self.lib.validate_login(u_bytes, p_bytes):
+            if user_db.validate_credentials(username, password):
                 self.login_attempts = 0  # Reset on success
+                self.current_username = username  # Store for TOTP verification
                 self.current_stage = 2
                 self.setup_ui()
             else:
@@ -882,17 +1088,55 @@ class SecureAuthApp:
             return
             
         try:
-            # Use dual-mode verification
-            if self.verify_totp_code(code_str):
+            # Verify TOTP using database
+            if user_db.verify_totp(self.current_username, code_str):
                 # Success animation
                 self.log_label.config(text="✓ Authentication Complete!", fg="#107C10")
-                messagebox.showinfo("Success", "✓ Authentication Complete!\n\nAccess Granted.\n\nWelcome to the secure system!")
+                messagebox.showinfo("Success", f"✓ Authentication Complete!\n\nAccess Granted.\n\nWelcome, {self.current_username}!")
                 self.root.quit()
             else:
                 messagebox.showerror("Verification Failed", "Invalid or expired TOTP code.\n\nPlease try again with the current code.")
                 self.log_label.config(text="● Verification failed - Please retry", fg="#D83B01")
         except Exception as e:
             messagebox.showerror("Error", f"Verification error: {e}")
+
+    def handle_signup(self):
+        """Handle user registration"""
+        username = self.signup_username_entry.get()
+        password = self.signup_password_entry.get()
+        
+        # Register user
+        success, message, totp_secret = user_db.register_user(username, password)
+        
+        if success:
+            # Store the secret for QR display
+            self.pending_signup_secret = totp_secret
+            self.current_username = username
+            
+            # Switch to QR setup screen
+            self.current_stage = 4
+            self.setup_ui()
+        else:
+            messagebox.showerror("Registration Failed", message)
+    
+    def switch_to_signup(self):
+        """Switch to signup screen"""
+        self.current_stage = 3
+        self.setup_ui()
+    
+    def switch_to_login(self):
+        """Switch back to login screen"""
+        self.current_stage = 1
+        self.login_attempts = 0
+        self.setup_ui()
+    
+    def finish_signup(self):
+        """Complete signup and return to login"""
+        messagebox.showinfo("Success", f"✓ Account created successfully!\n\nYou can now log in with your credentials.\n\nMake sure to use the TOTP code from your authenticator app.")
+        self.pending_signup_secret = None
+        self.current_username = None
+        self.current_stage = 1
+        self.setup_ui()
 
     def update_demo_totp(self):
         """Poll C++ backend for current code (only in demo mode)"""
